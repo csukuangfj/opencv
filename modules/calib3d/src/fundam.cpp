@@ -60,7 +60,7 @@ public:
         // are geometrically consistent. We check if every 3 correspondences sets
         // fulfills the constraint.
         //
-        // The usefullness of this constraint is explained in the paper:
+        // The usefulness of this constraint is explained in the paper:
         //
         // "Speeding-up homography estimation in mobile devices"
         // Journal of Real-Time Image Processing. 2013. DOI: 10.1007/s11554-012-0314-1
@@ -87,19 +87,25 @@ public:
         return true;
     }
 
+    /** m2 = H*m1
+     *  @param _m1 depth, CV_32F, 1-channel with 2 columns or 2-channel with 1 column
+     *  @param _m2 depth, CV_32F, 1-channel with 2 columns or 2-channel with 1 column
+     *  @param _model output, CV_64FC1, 3x3, the last element is 1
+     *  @return 1 on success, 0 on failure
+     */
     int runKernel( InputArray _m1, InputArray _m2, OutputArray _model ) const
     {
         Mat m1 = _m1.getMat(), m2 = _m2.getMat();
         int i, count = m1.checkVector(2);
-        const Point2f* M = m1.ptr<Point2f>();
+        const Point2f* M = m1.ptr<Point2f>(); // m=H*M
         const Point2f* m = m2.ptr<Point2f>();
 
         double LtL[9][9], W[9][1], V[9][9];
-        Mat _LtL( 9, 9, CV_64F, &LtL[0][0] );
-        Mat matW( 9, 1, CV_64F, W );
-        Mat matV( 9, 9, CV_64F, V );
-        Mat _H0( 3, 3, CV_64F, V[8] );
-        Mat _Htemp( 3, 3, CV_64F, V[7] );
+        Mat _LtL( 9, 9, CV_64F, &LtL[0][0] ); // for the 9x9 symmetric coefficient matrix
+        Mat matW( 9, 1, CV_64F, W ); // for eigen values in descending order
+        Mat matV( 9, 9, CV_64F, V ); // for eigen vectors
+        Mat _H0( 3, 3, CV_64F, V[8] ); // the eigen vector corresponding to the least eigen value
+        Mat _Htemp( 3, 3, CV_64F, V[7] ); // just a temporary variable
         Point2d cM(0,0), cm(0,0), sM(0,0), sm(0,0);
 
         for( i = 0; i < count; i++ )

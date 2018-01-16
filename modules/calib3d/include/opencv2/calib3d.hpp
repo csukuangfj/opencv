@@ -76,15 +76,15 @@ where:
 -   \f$(X, Y, Z)\f$ are the coordinates of a 3D point in the world coordinate space
 -   \f$(u, v)\f$ are the coordinates of the projection point in pixels
 -   \f$A\f$ is a camera matrix, or a matrix of intrinsic parameters
--   \f$(cx, cy)\f$ is a principal point that is usually at the image center
--   \f$fx, fy\f$ are the focal lengths expressed in pixel units.
+-   \f$(c_x, c_y)\f$ is the principal point that is usually at the image center
+-   \f$f_x, f_y\f$ are the focal lengths expressed in pixel units.
 
 Thus, if an image from the camera is scaled by a factor, all of these parameters should be scaled
 (multiplied/divided, respectively) by the same factor. The matrix of intrinsic parameters does not
 depend on the scene viewed. So, once estimated, it can be re-used as long as the focal length is
 fixed (in case of zoom lens). The joint rotation-translation matrix \f$[R|t]\f$ is called a matrix of
 extrinsic parameters. It is used to describe the camera motion around a static scene, or vice versa,
-rigid motion of an object in front of a still camera. That is, \f$[R|t]\f$ translates coordinates of a
+rigid motion of an object in front of a still camera. That is, \f$[R|t]\f$ transforms coordinates of a
 point \f$(X, Y, Z)\f$ to a coordinate system, fixed with respect to the camera. The transformation above
 is equivalent to the following (when \f$z \ne 0\f$ ):
 
@@ -125,7 +125,7 @@ The next figure shows two common types of radial distortion: barrel distortion (
 In some cases the image sensor may be tilted in order to focus an oblique plane in front of the
 camera (Scheimpfug condition). This can be useful for particle image velocimetry (PIV) or
 triangulation with a laser fan. The tilt causes a perspective distortion of \f$x''\f$ and
-\f$y''\f$. This distortion can be modelled in the following way, see e.g. @cite Louhichi07.
+\f$y''\f$. This distortion can be modeled in the following way, see e.g. @cite Louhichi07.
 
 \f[\begin{array}{l}
 s\vecthree{x'''}{y'''}{1} =
@@ -188,17 +188,14 @@ pattern (every view is described by several 3D-2D point correspondences).
   @{
     @defgroup calib3d_fisheye Fisheye camera model
 
-    Definitions: Let P be a point in 3D of coordinates X in the world reference frame (stored in the
-    matrix X) The coordinate vector of P in the camera reference frame is:
+    Definitions: Let \f$P\f$ be a point in 3D with coordinates \f$X\f$ in the world reference frame (stored in the
+    vector \f$X\f$) The coordinate vector \f$X_c=(x,y,z)\f$ of \f$P\f$ in the camera reference frame is:
 
-    \f[Xc = R X + T\f]
+    \f[X_c = R X + T\f]
 
-    where R is the rotation matrix corresponding to the rotation vector om: R = rodrigues(om); call x, y
-    and z the 3 coordinates of Xc:
+    where \f$R\f$ is the rotation matrix corresponding to the rotation vector om: R = rodrigues(om).
 
-    \f[x = Xc_1 \\ y = Xc_2 \\ z = Xc_3\f]
-
-    The pinhole projection coordinates of P is [a; b] where
+    The pinhole projection coordinates of \f$P\f$ is [a; b] where
 
     \f[a = x / z \ and \ b = y / z \\ r^2 = a^2 + b^2 \\ \theta = atan(r)\f]
 
@@ -275,7 +272,7 @@ enum { CALIB_USE_INTRINSIC_GUESS = 0x00001,
        CALIB_SAME_FOCAL_LENGTH   = 0x00200,
        // for stereo rectification
        CALIB_ZERO_DISPARITY      = 0x00400,
-       CALIB_USE_LU              = (1 << 17), //!< use LU instead of SVD decomposition for solving. much faster but potentially less precise
+       CALIB_USE_LU              = (1 << 17), //!< use LU instead of SVD decomposition for solving. Much faster but potentially less precise
      };
 
 //! the algorithm for finding fundamental matrix
@@ -289,9 +286,9 @@ enum { FM_7POINT = 1, //!< 7-point algorithm
 
 /** @brief Converts a rotation matrix to a rotation vector or vice versa.
 
-@param src Input rotation vector (3x1 or 1x3) or rotation matrix (3x3).
-@param dst Output rotation matrix (3x3) or rotation vector (3x1 or 1x3), respectively.
-@param jacobian Optional output Jacobian matrix, 3x9 or 9x3, which is a matrix of partial
+@param src Input rotation vector (3x1 or 1x3) or rotation matrix (3x3). The depth has to be CV_32F or CV_64F.
+@param dst Output rotation matrix (3x3) or rotation vector (3x1), respectively.
+@param jacobian Optional output Jacobian matrix, 9x3 or 3x9, which is a matrix of partial
 derivatives of the output array components with respect to the input array components.
 
 \f[\begin{array}{l} \theta \leftarrow norm(r) \\ r  \leftarrow r/ \theta \\ R =  \cos{\theta} I + (1- \cos{\theta} ) r r^T +  \sin{\theta} \vecthreethree{0}{-r_z}{r_y}{r_z}{0}{-r_x}{-r_y}{r_x}{0} \end{array}\f]
@@ -302,7 +299,7 @@ Inverse transformation can be also done easily, since
 
 A rotation vector is a convenient and most compact representation of a rotation matrix (since any
 rotation matrix has just 3 degrees of freedom). The representation is used in the global 3D geometry
-optimization procedures like calibrateCamera, stereoCalibrate, or solvePnP .
+optimization procedures like cv::calibrateCamera, cv::stereoCalibrate, or cv::solvePnP .
  */
 CV_EXPORTS_W void Rodrigues( InputArray src, OutputArray dst, OutputArray jacobian = noArray() );
 
@@ -314,19 +311,21 @@ CV_EXPORTS_W void Rodrigues( InputArray src, OutputArray dst, OutputArray jacobi
 
 /** @brief Finds a perspective transformation between two planes.
 
-@param srcPoints Coordinates of the points in the original plane, a matrix of the type CV_32FC2
-or vector\<Point2f\> .
+@param srcPoints Coordinates of the points in the original plane, a matrix of the type CV_32FC2,
+vector\<Point2f\>, CV_32FC3 or vector\<Point3f\>.
 @param dstPoints Coordinates of the points in the target plane, a matrix of the type CV_32FC2 or
 a vector\<Point2f\> .
 @param method Method used to computed a homography matrix. The following methods are possible:
--   **0** - a regular method using all the points
+-   **0** - a regular method (least squares) using all the points
 -   **RANSAC** - RANSAC-based robust method
 -   **LMEDS** - Least-Median robust method
 -   **RHO**    - PROSAC-based robust method
+
+If there are only 4 points available, method = 0 is used.
 @param ransacReprojThreshold Maximum allowed reprojection error to treat a point pair as an inlier
 (used in the RANSAC and RHO methods only). That is, if
 \f[\| \texttt{dstPoints} _i -  \texttt{convertPointsHomogeneous} ( \texttt{H} * \texttt{srcPoints} _i) \|  >  \texttt{ransacReprojThreshold}\f]
-then the point \f$i\f$ is considered an outlier. If srcPoints and dstPoints are measured in pixels,
+then the point \f$i\f$ is considered as an outlier. If srcPoints and dstPoints are measured in pixels,
 it usually makes sense to set this parameter somewhere in the range of 1 to 10.
 @param mask Optional output mask set by a robust method ( RANSAC or LMEDS ). Note that the input
 mask values are ignored.
@@ -340,7 +339,7 @@ destination planes:
 
 so that the back-projection error
 
-\f[\sum _i \left ( x'_i- \frac{h_{11} x_i + h_{12} y_i + h_{13}}{h_{31} x_i + h_{32} y_i + h_{33}} \right )^2+ \left ( y'_i- \frac{h_{21} x_i + h_{22} y_i + h_{23}}{h_{31} x_i + h_{32} y_i + h_{33}} \right )^2\f]
+\f[\sum _i \left(\left ( x'_i- \frac{h_{11} x_i + h_{12} y_i + h_{13}}{h_{31} x_i + h_{32} y_i + h_{33}} \right )^2+ \left ( y'_i- \frac{h_{21} x_i + h_{22} y_i + h_{23}}{h_{31} x_i + h_{32} y_i + h_{33}} \right )^2\right)\f]
 
 is minimized. If the parameter method is set to the default value 0, the function uses all the point
 pairs to compute an initial homography estimate with a simple least-squares scheme.
@@ -364,7 +363,7 @@ correctly only when there are more than 50% of inliers. Finally, if there are no
 noise is rather small, use the default method (method=0).
 
 The function is used to find initial intrinsic and extrinsic matrices. Homography matrix is
-determined up to a scale. Thus, it is normalized so that \f$h_{33}=1\f$. Note that whenever an H matrix
+determined up to a scale. Thus, it is normalized so that \f$h_{33}=1\f$. Note that whenever an \f$H\f$ matrix
 cannot be estimated, an empty one will be returned.
 
 @sa
@@ -1371,22 +1370,22 @@ CV_EXPORTS_W Mat getOptimalNewCameraMatrix( InputArray cameraMatrix, InputArray 
 
 /** @brief Converts points from Euclidean to homogeneous space.
 
-@param src Input vector of N-dimensional points.
+@param src Input vector of N-dimensional points, where N can be 2 or 3. The depth can be CV_32S, CV_32F and CV_64F.
 @param dst Output vector of N+1-dimensional points.
 
 The function converts points from Euclidean to homogeneous space by appending 1's to the tuple of
-point coordinates. That is, each point (x1, x2, ..., xn) is converted to (x1, x2, ..., xn, 1).
+point coordinates. That is, each point \f$(x_1, x_2, \ldots, x_n)\f$ is converted to \f$(x_1, x_2,\ldots, x_n, 1)\f$.
  */
 CV_EXPORTS_W void convertPointsToHomogeneous( InputArray src, OutputArray dst );
 
 /** @brief Converts points from homogeneous to Euclidean space.
 
-@param src Input vector of N-dimensional points.
+@param src Input vector of N-dimensional points. N can be 3 or 4. The depth has to be CV_32S, CV_32F or CV_64F.
 @param dst Output vector of N-1-dimensional points.
 
 The function converts points homogeneous to Euclidean space using perspective projection. That is,
-each point (x1, x2, ... x(n-1), xn) is converted to (x1/xn, x2/xn, ..., x(n-1)/xn). When xn=0, the
-output point coordinates will be (0,0,0,...).
+each point \f$(x_1, x_2, \ldots, x_{n-1}, x_n)\f$ is converted to \f$(x_1/x_n, x_2/x_n,\ldots,x_{n-1}/x_n)\f$. When \f$x_n=0\f$, the
+output point coordinates will be \f$(x_1,x_2,\ldots,x_{n-1})\f$.
  */
 CV_EXPORTS_W void convertPointsFromHomogeneous( InputArray src, OutputArray dst );
 
@@ -1396,7 +1395,7 @@ CV_EXPORTS_W void convertPointsFromHomogeneous( InputArray src, OutputArray dst 
 @param dst Output vector of 2D, 3D, or 4D points.
 
 The function converts 2D or 3D points from/to homogeneous coordinates by calling either
-convertPointsToHomogeneous or convertPointsFromHomogeneous.
+cv::convertPointsToHomogeneous or cv::convertPointsFromHomogeneous.
 
 @note The function is obsolete. Use one of the previous two functions instead.
  */
